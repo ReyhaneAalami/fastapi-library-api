@@ -24,7 +24,7 @@ A simple REST API for managing library books, built with Python and FastAPI.
 Clone this repository:
 
 ```bash
-git clone YOUR_REPOSITORY_URL
+git clone https://github.com/ReyhaneAalami/fastapi-library-api.git
 cd fastapi-library-api
 ```
 
