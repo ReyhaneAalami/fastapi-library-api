@@ -28,8 +28,8 @@ class Book(BaseModel):
     year: int | None = None
 
 
-# In-memory storage; no database
-books: list[dict] = []
+# In-memory storage: book ID -> book data
+books: dict[int, dict] = {}
 next_book_id = 1
 
 
@@ -41,13 +41,11 @@ def home():
     }
 
 
-# 1. Get all books
 @app.get("/books", response_model=list[Book])
 def get_books():
-    return books
+    return list(books.values())
 
 
-# 2. Create a book
 @app.post(
     "/books",
     response_model=Book,
@@ -61,60 +59,59 @@ def create_book(book: BookCreate):
         **book.model_dump(),
     }
 
-    books.append(new_book)
+    books[next_book_id] = new_book
     next_book_id += 1
 
     return new_book
 
 
-# 3. Get one book by ID
 @app.get("/books/{book_id}", response_model=Book)
 def get_book(book_id: int):
-    for book in books:
-        if book["id"] == book_id:
-            return book
+    book = books.get(book_id)
 
-    raise HTTPException(
-        status_code=404,
-        detail="Book not found",
-    )
+    if book is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Book not found",
+        )
+
+    return book
 
 
-# 4. Update selected book fields
 @app.patch("/books/{book_id}", response_model=Book)
 def update_book(book_id: int, updated_data: BookUpdate):
-    for book in books:
-        if book["id"] == book_id:
-            changes = updated_data.model_dump(exclude_unset=True)
+    book = books.get(book_id)
 
-            for field in ("title", "author"):
-                if field in changes and changes[field] is None:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=f"{field} cannot be null",
-                    )
+    if book is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Book not found",
+        )
 
-            book.update(changes)
-            return book
+    changes = updated_data.model_dump(exclude_unset=True)
 
-    raise HTTPException(
-        status_code=404,
-        detail="Book not found",
-    )
+    for field in ("title", "author"):
+        if field in changes and changes[field] is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} cannot be null",
+            )
+
+    book.update(changes)
+    return book
 
 
-# 5. Delete a book
 @app.delete("/books/{book_id}")
 def delete_book(book_id: int):
-    for index, book in enumerate(books):
-        if book["id"] == book_id:
-            deleted_book = books.pop(index)
-            return {
-                "message": "Book deleted successfully",
-                "deleted_book": deleted_book,
-            }
+    deleted_book = books.pop(book_id, None)
 
-    raise HTTPException(
-        status_code=404,
-        detail="Book not found",
-    )
+    if deleted_book is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Book not found",
+        )
+
+    return {
+        "message": "Book deleted successfully",
+        "deleted_book": deleted_book,
+    }
